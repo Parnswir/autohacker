@@ -115,8 +115,11 @@ def buy(currency, user):
     max_available = min(available, 0.2 * market_cap - already_bought)
     amount = min(max_available, max_amount)
     rank = get_rank(user)
-    if amount == 0 or currency.get('levelReq', 99) > rank:
-        logger.warning('Trying to buy %d %s, but that\'s not possible.' % (amount, name, ))
+    if amount == 0:
+        return user
+    rank_needed = currency.get('levelReq', 99)
+    if rank_needed > rank:
+        logger.warning('Buying %s is only possible with rank %d. You are only rank %d.' % (name, rank_needed, rank ))
         return user
     withdraw(max(math.ceil(amount * price) - get_bitcoins(user), 0))
     response = session.post(API_BASE + 'currency/buy', data={'amount': amount, 'name': name})
@@ -144,7 +147,7 @@ def sell(currency, user):
         user = res.get('user', user)
         logger.info('Sold %d %s for %d bitcoins.' % (amount, name, amount * price))
     else:
-        logger.error('Failed to buy %s' % (name,), res)
+        logger.error('Failed to sell %s' % (name,), res)
     deposit_all()
     return user
 
