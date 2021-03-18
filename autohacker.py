@@ -3,16 +3,14 @@ import sys
 import time
 import logging
 import math
+import argparse
 
 API_BASE = 'http://localhost:5000/api/'
-if len(sys.argv) > 1:
-    API_BASE = sys.argv[1]
-
 USERNAME = 'alice@email.com'
 PASSWORD = 'alice'
-if len(sys.argv) > 3:
-    USERNAME = sys.argv[2]
-    PASSWORD = sys.argv[3]
+INTERVAL = 3600
+
+config = {}
 
 logger = logging.getLogger('autohacker')
 logger.setLevel(logging.INFO)
@@ -24,15 +22,31 @@ session = requests.Session()
 profileId = ''
 
 
-def login(username, password):
-    response = session.post(API_BASE + 'login', data={'email': username, 'password': password})
+def init_argparse():
+    parser = argparse.ArgumentParser(
+        usage="%(prog)s [-uepiv]",
+        description="Become a rich hacker over night."
+    )
+    parser.add_argument(
+        "-v", "--version", action="version",
+        version = f"{parser.prog} version 1.0.0"
+    )
+    parser.add_argument("-u", "--url", help="the API base URL", default=API_BASE)
+    parser.add_argument("-e", "--email", help="the user's email", default=USERNAME)
+    parser.add_argument("-p", "--password", help="the user's password", default=PASSWORD)
+    parser.add_argument("-i", "--interval", help="the refresh interval", type=int, default=INTERVAL)
+    return parser
+
+
+def login():
+    response = session.post(config.get('url') + 'login', data={'email': config.get('email'), 'password': config.get('password')})
     global profileId
     profileId = response.json().get('_id')
     logger.info('Connected as %s' % (profileId,))
 
 
 def get_profile():
-    response = session.get(API_BASE + 'profile')
+    response = session.get(config.get('url') + 'profile')
     return response.json().get('user', {})
 
 
@@ -50,7 +64,7 @@ def get_ledger(user=None):
 
 def deposit(amount):
     logger.info('Depositing %d bitcoins...' % (amount,))
-    response = session.post(API_BASE + 'ledger/deposit', data={'depositAmount': amount})
+    response = session.post(config.get('url') + 'ledger/deposit', data={'depositAmount': amount})
     res = response.json()
     if response.status_code == 200:
         current_deposit = get_ledger(res.get('user'))
@@ -68,7 +82,7 @@ def deposit_all():
 
 def withdraw(amount):
     logger.info('Withdrawing %d bitcoins...' % (amount,))
-    response = session.post(API_BASE + 'ledger/withdraw', data={'withdrawAmount': amount})
+    response = session.post(config.get('url') + 'ledger/withdraw', data={'withdrawAmount': amount})
     res = response.json()
     if response.status_code == 200:
         current_deposit = get_ledger(res.get('user'))
@@ -86,7 +100,7 @@ def withdraw_all():
 
 def get_currencies():
     logger.info('Fetching crypto currency data...')
-    response = session.get(API_BASE + 'currency')
+    response = session.get(config.get('url') + 'currency')
     return response.json().get('currency', [])
 
 
@@ -122,7 +136,7 @@ def buy(currency, user):
         logger.warning('Buying %s is only possible with rank %d. You are only rank %d.' % (name, rank_needed, rank ))
         return user
     withdraw(max(math.ceil(amount * price) - get_bitcoins(user), 0))
-    response = session.post(API_BASE + 'currency/buy', data={'amount': amount, 'name': name})
+    response = session.post(config.get('url') + 'currency/buy', data={'amount': amount, 'name': name})
     res = response.json()
     if response.status_code == 200:
         user = res.get('user', user)
@@ -141,7 +155,7 @@ def sell(currency, user):
         logger.warning('Trying to sell %s, but none available!' % (name,))
         return user
     price = currency.get('price', 0)
-    response = session.post(API_BASE + 'currency/sell', data={'amount': amount, 'name': name})
+    response = session.post(config.get('url') + 'currency/sell', data={'amount': amount, 'name': name})
     res = response.json()
     if response.status_code == 200:
         user = res.get('user', user)
@@ -188,7 +202,7 @@ def earn_battery():
         if code != '':
             code_available = True
             logger.info('Redeeming code "%s" for option "%s"...' % (code, key,))
-            res = session.post(API_BASE + 'earnBattery/redeem', data={ 'code': code })
+            res = session.post(config.get('url') + 'earnBattery/redeem', data={ 'code': code })
             if res.status_code == 200:
                 logger.info('Success!')
             else:
@@ -197,10 +211,18 @@ def earn_battery():
         logger.info('Nothing to redeem...')
 
 
+def wait():
+    logger.info('Sleeping for %d seconds...' % (config.get('interval'),))
+    time.sleep(config.get('interval'))
+
+
 if __name__ == '__main__':
+    parser = init_argparse()
+    config = vars(parser.parse_args())
+    print(config)
     logger.info('Starting autohacker')
-    login(USERNAME, PASSWORD)
+    login()
     while True:
         earn_battery()
         trade()
-        time.sleep(3600)
+        wait()
