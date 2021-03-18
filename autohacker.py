@@ -75,7 +75,7 @@ def withdraw(amount):
         current_bitcoins = get_bitcoins(res.get('user'))
         logger.info('Success. Current deposit: %d \t Current bitcoins: %d' % (current_deposit, current_bitcoins,))
     else:
-        logger.error('Withdrawal failed', res)
+        logger.error('Withdrawal failed: "%s"' % (res, ))
 
 
 def withdraw_all():
@@ -131,7 +131,7 @@ def buy(currency, user):
     else:
         logger.error('Failed to buy %s' % (name, ), res)
     deposit_all()
-    return user
+    return get_profile()
 
 
 def sell(currency, user):
@@ -149,7 +149,7 @@ def sell(currency, user):
     else:
         logger.error('Failed to sell %s' % (name,), res)
     deposit_all()
-    return user
+    return get_profile()
 
 
 def trade():
